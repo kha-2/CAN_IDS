@@ -1,0 +1,44 @@
+TCN(Temporal Convolution Network) 
+:시간 순서에 따른 데이터 처리를 위한 신경망 
+1D 합성곱 네트워크 => 시계열 예측, 행동 인식 
+
+TCN의 구조 
+인과성 합성곱(Causal Convolution)과 팽창 합성곱(Dilated Convolution) 을 활용한 시간 순 데이터 처리 
+Residual Block: 학습 안정성을 위한 잔차 연결 포함
+ReLU + Dropout: 일반적인 비선형성과 과적합 방지를 위해 사용 
+
+1. Causal Convolution (인과적 합성곱)
+  현재 시점의 출력을 계산할 때 미래 입력을 보지 않기위한 작업
+2. Dilated Convolution (팽창 합성곱)
+  간격을 띄워서 보는 합성곱 => 멀리 떨어진 시점도 한번에 보게 만듬
+3. Residual Block (르넷 스타일 스킵연결)
+4. 1D CNN 구조로 RNN/LSTM 보다 긴 맥락을 기억 
+
+[ Causal Dilated Conv ]
+[ ReLU ]
+[ LayerNorm ]
+[ Dropout ]
+[ Skip Connection ]
+
+Kernel Size(커널): 컨볼루션의 시야 결정=> 필터(원본을 파악하는 필터)
+Stride(스트라이드): 이미지를 횡단할 때 커널의 스텝 사이즈=> 커널은 프레임(필터)같은건데 이것이 옮겨갈때 몇 칸씩 점프할것인지
+Padding(패딩): 샘플 테두리 어떻게 결정할지 결정, 커널을 지나면서 사이즈가 줄어드는데 그걸 줄어들지 않게 하는 요소(실제 데이터 패딩과 동일하게 취급해도 무방)
+=> 패딩을 제대로 해주지 않으면 봐야하는 테두리 값을 제대로 보지 못함 => 패딩으로 null값을 넣어 봐야하는 곳들을 중앙으로 밀어넣어 볼 수 있도록 만듬
+
+TCN은 특성상 현재와 과거에만 의존하는 causaulity를 만족해야함 => 1차원 convolution을 사용하여 kernel 크기 -1 만큼의 제로 패딩을 전체 시퀸스의 길이를 유지하기 위해 
+"양쪽에 붙임" 
+
+Dilation rate: 커널 사이의 간격을 정의함 
+Dilated Convolution 
+CNN 커널 사이에 간격을 넣어서 멀리 있는 과거까지 한번에 보게 만든 합성
+리셉티브 필드 = 모델이 한 번에 볼 수 있는 시간 길이
+예를 들어 커널=3일 때
+
+1층: dilation = 1 → t-2, t-1, t
+
+2층: dilation = 2 → t-4, t-2, t
+
+3층: dilation = 4 → t-8, t-4, t
+
+4층: dilation = 8 → t-16, t-8, t
+-> 2^L 꼴로 리셉티브 필드가 폭발적으로 증가
