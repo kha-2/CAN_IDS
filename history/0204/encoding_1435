@@ -1,0 +1,296 @@
+# %%
+import os
+import pandas as pd
+import numpy as np
+import xxhash
+from numba import njit, float32, int64, types
+from numba.typed import Dict
+
+# %%
+#################################
+# 1. Load address
+#################################
+Base_dir = "C:/Users/user/Desktop/IDS_masters/9) Car-Hacking Dataset"
+
+attack_dir = {
+    "Dos" : 1,
+    "Fuzzing" :2 ,
+    "Spoofing" : 4
+}
+
+
+### 공격 파일 수집 ###
+attack_files = []
+
+for folder, attack_id in attack_dir.items():
+    folder_path = os.path.join(Base_dir,folder)
+
+    for fname in os.listdir(folder_path):
+        if fname.endswith(".csv"):
+            attack_files.append({
+                "path" : os.path.join(folder_path, fname),
+                "attack_id": attack_id
+            })
+
+# %%
+#################################
+# 2. Visualization Mirgu Dataset
+#################################
+hash_cache = {}
+
+# [ADD] payload 8바이트 리스트로 만드는 함수 (너가 쓰던 스타일)
+def parse_payload(row):
+    # row에는 b0~b7 컬럼이 있고, 이미 0패딩되어 있음
+    return [int(row[f"b{i}"]) for i in range(8)]
+
+def process_csv_file(path, attack_id):
+    rows = []
+    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+
+            parts = line.split(",")
+            if len(parts) < 4:
+                continue
+
+            ts_str, canid_raw, dlc_str = parts[0], parts[1], parts[2]
+            label = parts[-1].strip()         # [MINOR] strip
+            data_tokens = parts[3:-1]
+
+            # dlc/ts 파싱
+            try:
+                ts = float(ts_str)
+                dlc = int(dlc_str)
+            except:
+                continue
+
+            # payload bytes: DLC 만큼만 읽고, 8바이트로 0 패딩
+            payload = []
+            for i in range(min(dlc, len(data_tokens), 8)):
+                tok = data_tokens[i].strip()
+                if tok == "" or tok.lower() == "nan":
+                    payload.append(0)
+                else:
+                    try:
+                        payload.append(int(tok, 16))
+                    except:
+                        payload.append(0)
+
+            payload += [0] * (8 - len(payload))
+            payload = payload[:8]
+
+            rows.append([ts, canid_raw, dlc, *payload, label])
+
+    df = pd.DataFrame(
+        rows,
+        columns=["timestamp", "CAN_ID", "DLC"] + [f"b{i}" for i in range(8)] + ["Label"]
+    )
+
+    # CAN_ID int 변환
+    df["int_CAN_ID"] = df["CAN_ID"].apply(lambda x: int(str(x).strip(), 16)).astype(np.int64)
+
+
+    # Payloads 컬럼 추가 
+    df["Payloads"] = df.apply(parse_payload, axis=1).tolist()
+
+
+    # 라벨링
+    df["Labeling"] = df["Label"].map({"T": attack_id, "R": 0}).fillna(0).astype(int)
+
+    # 4. [추가] DLC 타입 변환 (Numba 호환성을 위해 int64 권장)
+    df["DLC"] = df["DLC"].astype(np.int64)
+
+    df = df[["timestamp","int_CAN_ID","DLC","Payloads","Labeling"]]
+
+    return df
+
+
+# %%
+@njit
+def popcount64(x):
+    # x: uint8 -> 0~255
+    c = 0
+    v = int64(x)
+    while v:
+        v &= v - np.uint64(1)
+        c += 1
+    return c
+
+@njit
+def pack_payload_u64(row):
+    v = np.uint64(0)
+    for i in range(8):
+        v |= np.uint64(row[i]) << (i * 8)
+    return v
+
+@njit(fastmath=True)
+def calculate_features_numba(timestamps, can_ids, dlcs, payloads):
+    n = len(timestamps)
+    features = np.zeros((n, 6), dtype=np.float32)
+    
+    last_time_map = Dict.empty(key_type=types.int64, value_type=types.float64) # 이전 패킷 시간
+    last_iat_map = Dict.empty(key_type=types.int64, value_type=types.float64) #이전 IAT
+    last_payload_map = Dict.empty(key_type=types.int64, value_type=types.uint64) #이전 ID Payload
+    last_id_map = Dict.empty(key_type=types.int64, value_type=types.float32) # 윈도우 내 id 빈도수
+    
+
+    # iat_history_map = Dict.empty(key_type=types.int64, value_type=types.float64[:])
+    # ent_history_map = Dict.empty(key_type=types.int64, value_type=types.float64[:])
+    # count_map = Dict.empty(key_type=types.int64, value_type=types.int64)
+    # global_count_map = Dict.empty(key_type=types.int64, value_type=types.int64)
+    prev_global_time = timestamps[0]
+
+    for i in range(n):
+        if (i % 64) == 0:
+            last_id_map.clear()
+        ts = timestamps[i]
+        cid = can_ids[i]
+        if np.isnan(ts): ts = prev_global_time
+
+        else: prev_global_time = ts
+        
+    
+        
+        # 1. [Index 1] ID IAT
+        if cid in last_time_map: 
+            id_iat = max(0.0, ts - last_time_map[cid])
+        else: 
+            id_iat = 0.0
+        features[i, 0] = float32(np.log1p(id_iat * 1000.0) / 7.0) 
+        
+        last_time_map[cid] = ts # 다음 계산을 위해 업데이트
+        
+        # --- 페이로드 관련 공통 준비 (Entropy, Mean, Std용) ---
+        counts = np.zeros(256, dtype=np.int32)
+        row = payloads[i]
+        s = 0.0
+        for b_idx in range(8):
+            val = row[b_idx]
+            counts[val] += 1
+            s += val
+
+        # 2.[index 2] : ID가 0x000인지 여부(Dos 구분에 매우 중요!)
+        is_zero_id = 1.0 if cid == 0 else 0.0
+        features[i, 1] = float32(is_zero_id)
+        
+
+        # 3. [Index 2] Entropy
+        ent = 0.0
+        for c in counts:
+            if c > 0:
+                p = c / 8.0
+                ent -= p * np.log(p)
+        features[i, 2] = float32(ent / 2.1)
+
+        
+        
+        # 4. [Index 3] Jitter
+        if cid in last_iat_map: 
+            jitter = abs(id_iat - last_iat_map[cid])
+        else: 
+            jitter = 0.0
+        features[i, 3] = float32(min(jitter, 0.05) / 0.05)
+        last_iat_map[cid] = id_iat # 업데이트
+
+        # 5. ID Hamming
+        cur_bytes = pack_payload_u64(row)
+
+        if cid in last_payload_map:
+            diff = cur_bytes ^ last_payload_map[cid]
+            id_ham = popcount64(diff)
+
+        else:
+            id_ham = 0
+
+        last_payload_map[cid] = cur_bytes
+        features[i,4] = float32(id_ham / 64)
+
+        # 6. Frequency
+        if cid in last_id_map:
+            cnt = last_id_map[cid]+1
+
+        else:
+            cnt = 1
+
+        last_id_map[cid] = int64(cnt)
+        features[i,5] = float32(cnt / 64)
+
+    return features
+
+# %%
+# ==========================================
+# 4. Making Feature with Numba
+# ==========================================
+
+def Make_feature(path, attack_id):
+
+    df = process_csv_file(path, attack_id)
+
+    # ======== to numpy ========== #
+    timestamps = df["timestamp"].to_numpy(np.float32)
+    can_ids = df["int_CAN_ID"].to_numpy(np.int64)
+    payloads = np.array(df["Payloads"].tolist(), dtype=np.uint8)
+    labels = df["Labeling"].to_numpy(np.int64)
+    dlcs = df["DLC"].to_numpy(np.int64)
+
+    
+    # ======== calculate feature ========== #
+    feature9 = calculate_features_numba(timestamps, can_ids, dlcs, payloads)
+    print(feature9.shape)
+
+    return feature9, labels
+
+# %%
+# ==========================================
+# 5. Slide Window and Label
+# ==========================================
+def Sliding_Window_and_Labeling(feature, label, win_size=64, stride=32):
+    windows = []
+    labels = []
+    n = feature.shape[0]
+    for start in range(0, n-win_size+1 , stride):
+        end = start + win_size
+        windows.append(feature[start:end])
+        labels.append(label[start:end])
+
+
+    return (
+        np.stack(windows, axis=0).astype(np.float32),
+        np.stack(labels, axis=0).astype(np.int64)
+    )
+
+# %%
+# ==========================================
+# 6. main
+# ==========================================
+all_x = []
+all_y = []
+
+for item in attack_files:
+    feature9, labels = Make_feature(item["path"], item["attack_id"]) # 각 feature 추출
+    windows, y = Sliding_Window_and_Labeling(feature9,labels) # 윈도우 만들기
+
+    all_x.append(windows)
+    all_y.append(y)
+
+all_x_win = np.concatenate(all_x, axis=0)
+all_y_win = np.concatenate(all_y, axis=0)
+
+# %%
+# ==========================================
+# 7. Save
+# ==========================================
+np.savez(
+    "C:/Users/user/Desktop/IDS_masters/dataset/carhacking_test_0204.npz",
+    X = all_x_win.astype(np.float32),
+    y = all_y_win.astype(np.int64)
+    )
+
+print(f" Saved dataset")
+
+print("X shape:", all_x_win.shape)
+print("y shape:", all_y_win.shape)
+
+
