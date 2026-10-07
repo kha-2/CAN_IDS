@@ -1,4 +1,4 @@
-# Robust-Scaling and Dual-TCN Based CAN Intrusion Detection System for Cross-Vehicle Generalization
+# Robust-Scaling and Dual-TCN based CAN Intrusion Detection for Cross-Vehicle Generalization
 
 **English** | [한국어](README_ko.md)
 
@@ -6,7 +6,7 @@ A three-person research project, presented as an oral-session paper at the 2026 
 
 | | |
 |---|---|
-| Paper | 교차 차량 일반화를 위한 Robust-Scaling 및 Dual-TCN 기반 CAN 침입 탐지 시스템<br/>*(Robust-Scaling and Dual-TCN Based CAN Intrusion Detection System for Cross-Vehicle Generalization)* |
+| Paper | 교차 차량 일반화를 위한 Robust-Scaling 및 Dual-TCN 기반 CAN 침입 탐지 시스템<br/>*(Robust-Scaling and Dual-TCN based CAN Intrusion Detection for Cross-Vehicle Generalization)* |
 | Venue | 2026 KSAE (Korean Society of Automotive Engineers) Spring Conference · oral session paper |
 | Topic | Packet-level CAN attack detection (Normal / DoS / Fuzzing / Spoofing) with cross-dataset generalization |
 | Period | 2026.01 – 2026.03 |
