@@ -61,7 +61,7 @@ CAN_IDS/
 ├── encoding/       # Final feature encoding (CAN CSV -> 13-channel windows, .npz)
 ├── scaling/        # Final feature scaling (RobustScaler-style, fit on train only)
 ├── model/          # Final 2-stage TCN training + evaluation, weights/
-├── data/mirgu/     # MIRGU window CSVs (zipped)
+├── data/           # Datasets (MIRGU window CSVs by attack type), see data/README.md
 └── experiments/    # All earlier experiments, by date (see experiments/README.md)
 ```
 
