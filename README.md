@@ -2,10 +2,11 @@
 
 **English** | [한국어](README_ko.md)
 
-A three-person research project on a deep-learning intrusion detection system (IDS) for in-vehicle CAN networks that keeps working on a dataset it was not trained on
+A three-person research project, presented as an oral-session paper at the 2026 KSAE Spring Conference, on a deep-learning intrusion detection system (IDS) for in-vehicle CAN networks that keeps working on a dataset it was not trained on
 
 | | |
 |---|---|
+| Venue | 2026 KSAE (Korean Society of Automotive Engineers) Spring Conference · oral session paper |
 | Topic | Packet-level CAN attack detection (Normal / DoS / Fuzzing / Spoofing) with cross-dataset generalization |
 | Period | 2026.01 – 2026.03 |
 | Team | Sihyeon Park, Yoonju Jeong, Jaeho Shin |
