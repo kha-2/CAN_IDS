@@ -1,0 +1,10 @@
+코드 인덱스	사람 기준 번호	의미
+features[:, 0]	1번	ID IAT (log scaled)
+features[:, 1]	2번	ID == 0x000 플래그
+features[:, 2]	3번	Entropy
+features[:, 3]	4번	Entropy * Hamming (complexity)
+features[:, 4]	5번	Hamming rate (Hamming / IAT)
+features[:, 5]	6번	윈도우 내 ID frequency
+features[:, 6]	7번	Markov score
+features[:, 7]	8번	ID별 Entropy Z-score
+features[:, 8]	9번	**per-ID, per-byte payload Z-score (max
