@@ -1,4 +1,4 @@
-# CAN 침입 탐지 — 교차 데이터셋 2단계 TCN
+# 교차 차량 일반화를 위한 Robust-Scaling 및 Dual-TCN 기반 CAN 침입 탐지 시스템
 
 [English](README.md) | **한국어**
 
@@ -6,6 +6,7 @@
 
 | | |
 |---|---|
+| 논문 | 교차 차량 일반화를 위한 Robust-Scaling 및 Dual-TCN 기반 CAN 침입 탐지 시스템 |
 | 발표 | 2026 한국자동차공학회(KSAE) 춘계학술대회 · 구두 발표(oral session) 논문 |
 | 주제 | 패킷 단위 CAN 공격 탐지(Normal / DoS / Fuzzing / Spoofing)와 교차 데이터셋 일반화 |
 | 기간 | 2026.01 – 2026.03 |
