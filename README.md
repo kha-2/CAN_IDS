@@ -66,7 +66,7 @@ CAN_IDS/
 ```
 
 The final version corresponds to `0313/REAL` on the `history` branch.
-All original branches (`history`, `J`, `S`, `p`) are kept as-is; their contents were copied into `experiments/`.
+The contents of the original branches (`history`, `J`, `S`, and the deleted `p`) were copied into `experiments/`.
 
 ---
 
@@ -97,8 +97,8 @@ All original branches (`history`, `J`, `S`, `p`) are kept as-is; their contents 
 - **Backbone**: TemporalConvNet, channels [32, 64, 128], dilation [1, 2, 4], kernel 3, causal convolutions with residual connections, 1×1 conv classifier per packet.
 - **Stage 1 (TCN1)**: channels `[0,1,2,3,4,5,12]` -> {Other, DoS, Fuzzing}.
 - **Stage 2 (TCN2)**: channels `[4,9]` -> {Normal, Spoofing}, trained only on Normal/Spoofing packets.
-- **Fusion**: DoS if p(DoS) ≥ 0.9, Fuzzing if p(Fuzzing) ≥ th_fuzz; otherwise Stage 2 decides Normal vs Spoofing.
-- Adam (lr 1e-4), ReduceLROnPlateau, early stopping, 20 epochs.
+- **Fusion**: DoS if p(DoS) ≥ 0.9, Fuzzing if p(Fuzzing) ≥ 0.1 (the larger logit wins if both); otherwise Stage 2 decides Normal vs Spoofing.
+- Adam (lr 1e-4, weight decay 1e-4), dropout 0.5, batch 64, ReduceLROnPlateau (factor 0.5, patience 3), early stopping (patience 5), up to 20 epochs.
 
 ### Results (stored notebook output)
 

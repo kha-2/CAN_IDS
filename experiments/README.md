@@ -1,6 +1,6 @@
 # Experiments
 
-Earlier experiments, ordered by date. Files were copied from the original branches, which are kept unchanged.
+Earlier experiments, ordered by date. Files were copied from the original branches (`history`, `J`, `S` are kept; `p` was deleted after copying).
 Unless noted, training data is Car Hacking Challenge (`0_Preliminary/1_Submission`) and test data is the Car-Hacking Dataset (cross-dataset).
 
 | Folder | Source | Summary |
