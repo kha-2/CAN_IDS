@@ -120,3 +120,13 @@ Replay is not part of the Car-Hacking Dataset and is not predicted by the model.
 - `oversample_attack_windows` is called, but the training loader uses the original split.
 - `FEATURE_NAMES` in the encoding notebooks still lists old feature names.
 - File paths are hard-coded (`C:/Users/user/Desktop/IDS_masters/...`).
+
+---
+
+## Contributors
+
+| GitHub | Role |
+|---|---|
+| [@kha-2](https://github.com/kha-2) | Feature encoding and model experiments, 2-stage TCN architecture |
+| [@yoonju04](https://github.com/yoonju04) | Markov-based encoding, 9-feature set design, single-TCN comparison |
+| [@greendino-04](https://github.com/greendino-04) | 6-feature encoding and TCN, feature exploration, final cross-dataset evaluation and feature importance |
