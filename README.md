@@ -1,108 +1,40 @@
-# CAN Intrusion Detection System
+# CAN Intrusion Detection — Cross-Dataset 2-Stage TCN
 
-This project focuses on developing a **deep learning-based Intrusion Detection System (IDS)** for detecting attacks on in-vehicle CAN networks.
+**English** | [한국어](README_ko.md)
 
-The main objective is to build a CAN IDS that does not overly depend on vehicle-specific CAN IDs or payload patterns, so that the model can maintain detection performance across different vehicles.
+A three-person research project on a deep-learning intrusion detection system (IDS) for in-vehicle CAN networks that keeps working on a dataset it was not trained on
 
----
+| | |
+|---|---|
+| Topic | Packet-level CAN attack detection (Normal / DoS / Fuzzing / Spoofing) with cross-dataset generalization |
+| Period | 2026.01 – 2026.03 |
+| Team | Sihyeon Park, Yoonju Jeong, Jaeho Shin |
+| Stack | Python · PyTorch · NumPy / pandas · Numba · scikit-learn · Jupyter |
+| Result | **Trained on Car Hacking Challenge 2021, tested on the Car-Hacking Dataset: accuracy 0.9793 · macro F1 0.9605** |
 
-## Research Objective
+## The Story in One Picture
 
-Many CAN IDS approaches learn patterns that are strongly tied to a specific vehicle, which can reduce performance when the model is applied to another vehicle.
+```mermaid
+flowchart LR
+    A["CNN baseline<br/>01.26–01.30<br/>9 timing / payload features"] --> B["TCN<br/>02.02–02.04<br/>high in-domain,<br/>fails on another dataset"]
+    B --> C["Feature search<br/>02.09–02.12<br/>Markov, z-score,<br/>162 candidates, 2-stage TCN"]
+    C --> D["ID-distribution features<br/>02.23–02.26<br/>12–13 features, Audi test"]
+    D --> E["Robust scaling<br/>03.05–03.08<br/>threshold tuning"]
+    E --> F(["Final<br/>03.13<br/>cross-dataset<br/>macro F1 0.96"])
 
-To improve cross-vehicle generalization, this project uses temporal and statistical characteristics of CAN traffic rather than directly relying on specific CAN IDs or payload values.
-
-The following traffic classes are considered:
-
-- Normal
-- DoS
-- Fuzzing
-- Replay
-- Spoofing
-
----
-
-## CAN Feature Extraction
-
-CAN packets are transformed into temporal and statistical features before being used as model inputs.
-
-The initial experiments used features such as:
-
-- Global Inter-Arrival Time
-- CAN ID Inter-Arrival Time
-- Payload Entropy
-- Hamming Distance
-- DLC
-- Payload Delta
-- Jitter
-- Payload Byte Mean
-- Payload Byte Standard Deviation
-
-CAN packets are grouped into sliding windows and used as sequential inputs to the IDS.
-
-```text
-CAN Packets
-     ↓
-Feature Extraction
-     ↓
-Sliding Window
-     ↓
-Deep Learning IDS
-     ↓
-Packet-level Attack Classification
+    classDef bad fill:#fde2e1,stroke:#c0392b,color:#5a1a14;
+    classDef good fill:#d8f0dc,stroke:#3c8a4f,color:#1b3d24;
+    class B bad;
+    class D,E,F good;
 ```
 
----
+- **Goal**: detect attacks without depending on one vehicle's CAN IDs or payload patterns, so the model still works on another vehicle's data
+- **What held us back**: models on timing and payload statistics reached macro F1 0.81–0.89 on a split of the training data but 0.31–0.50 on the Car-Hacking Dataset; Normal and Spoofing collapsed
+- **What turned it around**: features describing the CAN ID distribution inside a window (ID 0x000 flag, local frequency, ID entropy, top-1 share, dominance), a 2-stage TCN that handles Spoofing separately, and robust scaling fitted on training data only
 
-## Repository Structure
+## Result
 
-```text
-CAN_IDS/
-├── encoding/       # Final feature encoding (CAN CSV -> 13-channel windows, .npz)
-├── scaling/        # Final feature scaling (RobustScaler-style, fit on train only)
-├── model/          # Final 2-stage TCN training + evaluation, weights/
-├── data/           # Datasets (MIRGU window CSVs by attack type), see data/README.md
-└── experiments/    # All earlier experiments, by date (see experiments/README.md)
-```
-
-The final version corresponds to `0313/REAL` on the `history` branch.
-The contents of the original branches (`history`, `J`, `S`, and the deleted `p`) were copied into `experiments/`.
-
----
-
-## Final Pipeline
-
-| Step | File | Description |
-|---|---|---|
-| 1. Encoding | `encoding/car_challenge_encoding.ipynb` | Car Hacking Challenge (`1_Submission`) -> 13 packet-level features, window 128 / stride 64 -> `carchallenge_training_0313.npz` |
-| 1. Encoding | `encoding/carhacking_encoding.ipynb` | Car-Hacking Dataset (test) -> same features -> `carhacking_0313.npz` |
-| 2. Scaling | `scaling/robust_scaling.ipynb` | Per-channel `(x - median) / IQR`, clip to ±5, map to [0, 1]; statistics from train only -> `*_robust_0313.npz` |
-| 3. Model | `model/Multi_TCN.ipynb` | 2-stage TCN training and cross-dataset evaluation |
-| | `model/weights/TCN{1,2}_0313_all.pth` | Trained weights for the notebook above |
-
-### Features (13 channels)
-
-| Ch | Feature | Ch | Feature |
-|---|---|---|---|
-| 0 | is_cid0 (CAN ID == 0x000) | 7 | norm_by_win_mean |
-| 1 | DLC / 8 | 8 | freq_over_top1_log |
-| 2 | payload relative change (Hamming / per-ID EMA) | 9 | top1_share |
-| 3 | entropy × relative change | 10 | idx_gap_cv |
-| 4 | freq_local | 11 | dominance_ratio |
-| 5 | id_ent (ID entropy in window) | 12 | same_id_recent_k_surprise |
-| 6 | streak_ratio | | |
-
-### Model (2-stage TCN)
-
-- **Backbone**: TemporalConvNet, channels [32, 64, 128], dilation [1, 2, 4], kernel 3, causal convolutions with residual connections, 1×1 conv classifier per packet.
-- **Stage 1 (TCN1)**: channels `[0,1,2,3,4,5,12]` -> {Other, DoS, Fuzzing}.
-- **Stage 2 (TCN2)**: channels `[4,9]` -> {Normal, Spoofing}, trained only on Normal/Spoofing packets.
-- **Fusion**: DoS if p(DoS) ≥ 0.9, Fuzzing if p(Fuzzing) ≥ 0.1 (the larger logit wins if both); otherwise Stage 2 decides Normal vs Spoofing.
-- Adam (lr 1e-4, weight decay 1e-4), dropout 0.5, batch 64, ReduceLROnPlateau (factor 0.5, patience 3), early stopping (patience 5), up to 20 epochs.
-
-### Results (stored notebook output)
-
-Train: Car Hacking Challenge `1_Submission`, test: Car-Hacking Dataset (cross-dataset).
+Train: Car Hacking Challenge 2021 (`0_Preliminary/1_Submission`) · test: Car-Hacking Dataset (different vehicle, different recording)
 
 | Class | Precision | Recall | F1 |
 |---|---|---|---|
@@ -110,23 +42,77 @@ Train: Car Hacking Challenge `1_Submission`, test: Car-Hacking Dataset (cross-da
 | DoS | 1.0000 | 1.0000 | 1.0000 |
 | Fuzzing | 0.9989 | 0.9547 | 0.9763 |
 | Spoofing | 0.8382 | 0.9215 | 0.8779 |
+| **Overall** | | | **accuracy 0.9793 · macro F1 0.9605 · weighted F1 0.9797** |
 
-Overall accuracy 0.9793, macro F1 0.9605, weighted F1 0.9797.
-Replay is not part of the Car-Hacking Dataset and is not predicted by the model.
+Replay is not in the Car-Hacking Dataset and has no output class in the final model.
 
-### Known Issues
+## System
 
-- Replay has no output class in the 2-stage model.
-- `oversample_attack_windows` is called, but the training loader uses the original split.
-- `FEATURE_NAMES` in the encoding notebooks still lists old feature names.
-- File paths are hard-coded (`C:/Users/user/Desktop/IDS_masters/...`).
+```mermaid
+flowchart LR
+    CSV["CAN log<br/>(CSV)"] --> ENC["Encoding<br/>13 features per packet<br/>window 128 / stride 64"]
+    ENC --> SC["Robust scaling<br/>median / IQR from train<br/>clip ±5 → [0, 1]"]
+    SC --> T1["TCN1<br/>ch 0,1,2,3,4,5,12<br/>Other / DoS / Fuzzing"]
+    SC --> T2["TCN2<br/>ch 4,9<br/>Normal / Spoofing"]
+    T1 --> FU{"Fusion"}
+    T2 --> FU
+    FU --> OUT["Label per packet"]
+```
 
----
-
-## Contributors
-
-| GitHub | Role |
+| Part | What it does |
 |---|---|
-| [@kha-2](https://github.com/kha-2) | Feature encoding and model experiments, 2-stage TCN architecture |
-| [@yoonju04](https://github.com/yoonju04) | Markov-based encoding, 9-feature set design, single-TCN comparison |
-| [@greendino-04](https://github.com/greendino-04) | 6-feature encoding and TCN, feature exploration, final cross-dataset evaluation and feature importance |
+| Encoding | 13 features per packet: ID 0x000 flag, DLC, payload change, entropy × change, local frequency, ID entropy, streak ratio, window-normalised count, frequency vs. top-1 ID, top-1 share, index-gap CV, dominance, same-ID payload surprise |
+| Scaling | Per-channel `(x − median) / IQR` from training data, clip to ±5, map to [0, 1] |
+| TCN | Causal TCN, channels [32, 64, 128], dilation [1, 2, 4], kernel 3, residual blocks, 1×1 classifier per packet |
+| Fusion | DoS if p(DoS) ≥ 0.9, Fuzzing if p(Fuzzing) ≥ 0.1 (larger logit if both), otherwise TCN2 decides Normal vs Spoofing |
+
+## Team
+
+| <img src="https://github.com/kha-2.png" width="90"> | <img src="https://github.com/yoonju04.png" width="90"> | <img src="https://github.com/greendino-04.png" width="90"> |
+|:---:|:---:|:---:|
+| **Sihyeon Park**<br/>[@kha-2](https://github.com/kha-2) | **Yoonju Jeong**<br/>[@yoonju04](https://github.com/yoonju04) | **Jaeho Shin**<br/>[@greendino-04](https://github.com/greendino-04) |
+
+## Key Problems
+
+| Problem | Cause | What we did |
+|---|---|---|
+| High validation score, low score on another dataset | Timing and payload statistics are specific to one vehicle | Moved to CAN-ID-distribution features and tested on a different dataset |
+| Spoofing missed by a single model | Spoofing looks like Normal in most channels | Separate Normal-vs-Spoofing TCN on its own channels (single TCN: 11.8% Spoofing accuracy) |
+| Over-optimistic numbers | Random split of overlapping windows, oversampling before the split, testing on training-source data | Kept the cross-dataset test as the main measure |
+| Feature distributions shift between datasets | Raw scales differ by vehicle | Robust scaling with statistics from training data only |
+| Replay not detected | Replay was masked out of the loss from the early TCN runs; the 2-stage model has no Replay output | Left as future work |
+
+## Post-mortem
+
+Most of the gain came from changing *what* the model sees: TCN models went from macro F1 0.31–0.50 to 0.96 on the Car-Hacking Dataset once the features described the CAN ID distribution instead of per-vehicle timing, with the 2-stage split fixing Spoofing. Permutation tests on the final model show DoS depends almost entirely on the ID 0x000 flag, which is worth checking on a third dataset.
+
+Full analysis and lessons: [docs/postmortem.md](docs/postmortem.md)
+
+## Quick Start
+
+```bash
+pip install -r requirements.txt
+```
+
+Run the notebooks in this order (paths inside are hard-coded to the original machine, `C:/Users/user/Desktop/IDS_masters/...`):
+
+1. `encoding/car_challenge_encoding.ipynb` → `carchallenge_training_0313.npz`
+2. `encoding/carhacking_encoding.ipynb` → `carhacking_0313.npz`
+3. `scaling/robust_scaling.ipynb` → `carchallenge_robust_0313.npz`, `carhacking_robust_0313.npz`
+4. `model/Multi_TCN.ipynb` → `TCN1_0313_all.pth`, `TCN2_0313_all.pth` and the result table
+
+Exact final code as uploaded: `git checkout final-2026-03-13` (`0313/REAL/`)
+
+## Repository
+
+- `encoding/`: final feature encoding
+- `scaling/`: final robust scaling
+- `model/`: final 2-stage TCN and weights
+- `experiments/`: every earlier experiment, by date
+- `data/`: MIRGU window tables from the first experiments
+
+## Docs
+
+- [docs/postmortem.md](docs/postmortem.md): why cross-dataset failed and what fixed it, evaluation pitfalls, lessons
+- [docs/timeline.md](docs/timeline.md): experiments by date with their numbers
+- [docs/repository.md](docs/repository.md): folder tree, branches and tags, datasets
