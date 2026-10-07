@@ -65,7 +65,7 @@ CAN_IDS/
 └── experiments/    # All earlier experiments, by date (see experiments/README.md)
 ```
 
-The final version corresponds to `0308/FINAL` on the `history` branch.
+The final version corresponds to `0313/REAL` on the `history` branch.
 All original branches (`history`, `J`, `S`, `p`) are kept as-is; their contents were copied into `experiments/`.
 
 ---
@@ -74,11 +74,11 @@ All original branches (`history`, `J`, `S`, `p`) are kept as-is; their contents 
 
 | Step | File | Description |
 |---|---|---|
-| 1. Encoding | `encoding/car_challenge_encoding.ipynb` | Car Hacking Challenge CSV -> 13 packet-level features, window 128 / stride 64 |
-| 1. Encoding | `encoding/carhacking_encoding.ipynb` | Same features for the test dataset (`Base_dir` selects Car-Hacking or Audi) |
-| 2. Scaling | `scaling/robust_scaling.ipynb` | Per-channel `(x - median) / IQR`, clip to ±5, map to [0, 1]; statistics from train only |
-| 3. Model | `model/Multi_TCN.ipynb` | 2-stage TCN training and evaluation |
-| | `model/weights/TCN{1,2}_0305_653.pth` | Trained weights for the notebook above |
+| 1. Encoding | `encoding/car_challenge_encoding.ipynb` | Car Hacking Challenge (`1_Submission`) -> 13 packet-level features, window 128 / stride 64 -> `carchallenge_training_0313.npz` |
+| 1. Encoding | `encoding/carhacking_encoding.ipynb` | Car-Hacking Dataset (test) -> same features -> `carhacking_0313.npz` |
+| 2. Scaling | `scaling/robust_scaling.ipynb` | Per-channel `(x - median) / IQR`, clip to ±5, map to [0, 1]; statistics from train only -> `*_robust_0313.npz` |
+| 3. Model | `model/Multi_TCN.ipynb` | 2-stage TCN training and cross-dataset evaluation |
+| | `model/weights/TCN{1,2}_0313_all.pth` | Trained weights for the notebook above |
 
 ### Features (13 channels)
 
@@ -102,21 +102,21 @@ All original branches (`history`, `J`, `S`, `p`) are kept as-is; their contents 
 
 ### Results (stored notebook output)
 
-Train: Car Hacking Challenge `1_Submission`, test: Car Hacking Challenge `0_Training_test`.
+Train: Car Hacking Challenge `1_Submission`, test: Car-Hacking Dataset (cross-dataset).
 
-| Class | Accuracy |
-|---|---|
-| Normal | 99.41% |
-| DoS | 100.00% |
-| Fuzzing | 99.87% |
-| Spoofing | 32.75% |
-| Replay | not predicted |
+| Class | Precision | Recall | F1 |
+|---|---|---|---|
+| Normal | 0.9915 | 0.9843 | 0.9879 |
+| DoS | 1.0000 | 1.0000 | 1.0000 |
+| Fuzzing | 0.9989 | 0.9547 | 0.9763 |
+| Spoofing | 0.8382 | 0.9215 | 0.8779 |
 
-Overall accuracy 0.9787, macro F1 (present classes) 0.6337.
+Overall accuracy 0.9793, macro F1 0.9605, weighted F1 0.9797.
+Replay is not part of the Car-Hacking Dataset and is not predicted by the model.
 
 ### Known Issues
 
 - Replay has no output class in the 2-stage model.
 - `oversample_attack_windows` is called, but the training loader uses the original split.
 - `FEATURE_NAMES` in the encoding notebooks still lists old feature names.
-- File paths are hard-coded (`C:/Users/user/Desktop/IDS_masters/...`, `D:/IDS_masters/...`); the file name written by `robust_scaling.ipynb` differs from the one read by `Multi_TCN.ipynb`.
+- File paths are hard-coded (`C:/Users/user/Desktop/IDS_masters/...`).

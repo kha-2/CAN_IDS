@@ -19,8 +19,8 @@ Unless noted, training data is Car Hacking Challenge (`0_Preliminary/1_Submissio
 | `2026-02-24_stage2_feat` | history | Stage-2 feature selection |
 | `2026-02-26_12feat_audi` | history | 12 features, window 128; Audi test macro F1 0.914 |
 | `2026-03-05_robust_scaling` | history | Robust scaling introduced; feature distribution check; result logs |
-| `2026-03-08_threshold_tuning` | history | Fuzzing threshold sweep, dropout variants |
-| `2026-03-13_real_crossdataset` | history | Final code re-run on Car-Hacking (macro F1 0.96), permutation feature importance, single-TCN comparison |
+| `2026-03-08_threshold_tuning` | history | Fuzzing threshold sweep, dropout variants; `FINAL/` = 13-feature pipeline evaluated on Car Hacking Challenge `0_Training_test` |
+| `2026-03-13_real_crossdataset` | history | Permutation feature importance on the final model, single-TCN comparison (the final pipeline itself, `0313/REAL`, is in the repository root) |
 
 ## Renamed files
 
